@@ -1,5 +1,13 @@
-/* SPDX-License-Identifier: MIT */
-/* SPDX-FileCopyrightText: Copyright 2024 Sam Blenny */
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright 2024 Sam Blenny
+//
+// WebSerialDisplay: A virtual CircuitPython display over Web Serial
+//
+// Related Docs:
+// - https://developer.chrome.com/docs/capabilities/serial
+// - https://developer.mozilla.org/en-US/docs/Web/API/Web_Serial_API
+// - https://developer.mozilla.org/en-US/docs/Web/API/SerialPort
+//
 "use strict";
 
 const STATUS = document.querySelector('#status');   // Status span
@@ -11,6 +19,9 @@ const CTX = CANVAS.getContext("2d", {willReadFrequently: true});
 // UI Controls
 const SIZE = document.querySelector('#size');  // Frame size (px per side)
 const BPP = document.querySelector('#bpp');    // Bits per pixel
+
+// Serial Port
+var PORT = null;
 
 // Update status line span
 function setStatus(s) {
@@ -44,34 +55,57 @@ function handleNewFrame(now, metadata) {
     //CTX.putImageData(imageData, 0, 0);
 }
 
-// Attempt to start virtual display with data feed over Web Serial
-function startDisplay() {
-    // TODO: Web Serial startup stuff goes here
-    if (true) {
-        // Update HTML button
-        SER_BTN.classList.add('on');
-        SER_BTN.textContent = 'pause';
-        // Update status line
-        setStatus("connected");
-        // TODO register canvas updater event handler
+// Disconnect serial port and stop updating the canvas
+async function disconnect(status) {
+    if (PORT) {
+        await PORT.forget();
+        PORT = null;
     }
+    SER_BTN.classList.remove('on');
+    SER_BTN.textContent = 'Connect';
+    setStatus(status ? status : 'disconnected');
 }
 
-// Event handler to pause playback
-function pauseDisplay() {
-    SER_BTN.classList.remove('on');
-    SER_BTN.textContent = 'Start Serial';
-    setStatus("paused");
+// Attempt to start virtual display with data feed over Web Serial
+function connect() {
+    if (!('serial' in navigator)) {
+        setStatus('Browser does not support Web Serial');
+        alert('This browser does not support Web Serial');
+        return;
+    }
+    // Define a filter for Adafruit's USB vendor ID (works for Pi Pico)
+    const circuitpyFilter = [{usbVendorId: 0x239a}];
+    // Request access to serial port (trigger a browser permission prompt)
+    navigator.serial
+    .requestPort({filters: circuitpyFilter})
+    .then(async (response) => {
+        PORT = await response;
+        PORT.ondisconnect = async (event) => {
+            await event.target.close();
+            disconnect('serial device unplugged');
+        };
+        await PORT.open({baudRate: 115200});
+        // Update HTML button
+        SER_BTN.classList.add('on');
+        SER_BTN.textContent = 'disconnect';
+        // Update status line
+        setStatus('connected');
+        // ========================================================
+        // TODO: begin polling serial port for frame buffer updates
+        // ========================================================
+    })
+    .catch((err) => {
+        PORT = null;
+        setStatus('no serial port selected');
+    });
 }
 
 // Add on/off event handlers to the button
 SER_BTN.addEventListener('click', function() {
     if(SER_BTN.classList.contains('on')) {
-        // Was on, so turn it off
-        pauseDisplay();
+        disconnect();
     } else {
-        // Was off, so attempt to turn it on
-        startDisplay();
+        connect();
     }
 });
 

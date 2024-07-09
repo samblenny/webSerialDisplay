@@ -20,10 +20,6 @@ const CANVAS = document.querySelector('#canvas');   // Canvas
 
 const CTX = CANVAS.getContext("2d", {willReadFrequently: true});
 
-// UI Controls
-const SIZE = document.querySelector('#size');  // Frame size (px per side)
-const BPP = document.querySelector('#bpp');    // Bits per pixel
-
 // Serial Port
 var SER_PORT = null;
 
@@ -58,8 +54,8 @@ async function disconnect(status) {
 }
 
 async function paintFrame(data) {
-    // Set canvas size
-    const w = Number(SIZE.value);
+    // Set size of virtual display (should be 96x96 or 240x240)
+    const w = Math.round(Math.sqrt(data.length));
     const h = w;
     CANVAS.width = w;
     CANVAS.height = h;

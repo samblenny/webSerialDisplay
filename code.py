@@ -65,7 +65,7 @@ def main():
     gcCol()
     # Capture and send camera frames at approximately 2 frames per second
     while True:
-        sleep(0.5)
+        sleep(0.15)  # 0.15 -> 2fps @ 240x240px
         cam.capture(buf)
         send(buf)
         gcCol()

@@ -60,7 +60,7 @@ def main():
         mclk=None,
         size=(OV5640_SIZE_96X96 if (size==96) else OV5640_SIZE_240X240),
     )
-    cam.flip_x = True
+    cam.flip_y = True
     cam.colorspace = OV5640_COLOR_GRAYSCALE
     gcCol()
     # Capture and send camera frames at approximately 2 frames per second

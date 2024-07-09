@@ -43,12 +43,12 @@ def send(buf):
     stride = 96
     for i in range(0, len(buf), stride):
         wr(b64(buf[i:i+stride]))
-    wr("-----END FRAME-----\n")
+    wr('-----END FRAME-----\n')
 
 def main():
     # Make a buffer to hold captured pixel data
     gcCol()
-    size = 96
+    size = 240
     buf = bytearray(size * size)
     # Configure the camera
     cam = OV5640(
@@ -63,9 +63,9 @@ def main():
     cam.flip_x = True
     cam.colorspace = OV5640_COLOR_GRAYSCALE
     gcCol()
-    # Capture and send 1 camera frame approximately every 2 seconds
+    # Capture and send camera frames at approximately 2 frames per second
     while True:
-        sleep(2)
+        sleep(0.5)
         cam.capture(buf)
         send(buf)
         gcCol()

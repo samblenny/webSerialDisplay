@@ -2,12 +2,11 @@
 <!-- SPDX-FileCopyrightText: Copyright 2024 Sam Blenny -->
 # WebSerialDisplay
 
-**work in progress (alpha)**
-
 A virtual CircuitPython display over Web Serial.
 
+![screenshot of camera video feedback](screenshot1.jpg)
 
-<!--
+
 ## Hardware
 
 - Adafruit Proto Under Plate PiCowBell for Pico
@@ -23,6 +22,7 @@ A virtual CircuitPython display over Web Serial.
 - Adafruit PiCowbell Camera Breakout, 72° lens
   ([learn guide](https://learn.adafruit.com/adafruit-picowbell-camera-breakout),
   [product page](https://www.adafruit.com/product/5945))
+
 
 ## Try the Project Bundle
 
@@ -40,4 +40,4 @@ try the code:
 
 4. Copy the contents of the `'webserialdisplay/CircuitPython 9.x'` folder to
    your CIRCUITPY drive (assuming your board is running CircuitPython 9.x).
--->
+

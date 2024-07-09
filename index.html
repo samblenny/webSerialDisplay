@@ -5,7 +5,7 @@
 <title>WebSerialDisplay</title>
 <style>
  :root{--F: #ffdcec; --B: #1d1d1d; --H: #25c3c0; --L: #459cda; --O: #444;
-       --BTN: #32ea39; --PAD: 25px; --SIZE: 320px; }
+       --BTN: #32ea39; --PAD: 25px; --SIZE: 240px; }
  @media (prefers-color-scheme: light){
   :root{--F: #101010; --B: #f5f5f5; --H: #313131; --L: #3f40f9; --O: #aaa;
         --BTN: #3dff4d; }
@@ -25,7 +25,7 @@
  p{ margin: 11px 0; }
  .clear{ clear: both; }
  main{ margin: 0 auto; padding: 2px var(--PAD) 115px var(--PAD);
-  max-width: calc(2 * ( var(--SIZE) + var(--PAD) + 8px)); }
+  max-width: 500px; }
  #serial{ float: right; background: var(--BTN); font-size: 1.1em;
   padding: 10px; border-radius: 13px; border: 2px solid var(--H); }
  #serial.on{ background: var(--B); color: var(--F); }
@@ -55,15 +55,15 @@ status: <span id="status">loading...</span></p>
 <p>
 <label for="size">frame size</label>
 <select name="size" id="size">
- <option value="96">96x96 px</option>
  <option value="240">240x240 px</option>
+ <option value="96">96x96 px</option>
 </select>
 <label for="bpp">bits per pixel</label>
 <select name="bpp" id="bpp">
- <option value="1">1</option>
- <option value="2">2</option>
- <option value="2">4</option>
  <option value="2">8</option>
+ <option value="2">4</option>
+ <option value="2">2</option>
+ <option value="1">1</option>
 </select>
 </p>
 

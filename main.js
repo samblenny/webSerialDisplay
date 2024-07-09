@@ -5,8 +5,12 @@
 //
 // Related Docs:
 // - https://developer.chrome.com/docs/capabilities/serial
+// - https://codelabs.developers.google.com/codelabs/web-serial#0
 // - https://developer.mozilla.org/en-US/docs/Web/API/Web_Serial_API
 // - https://developer.mozilla.org/en-US/docs/Web/API/SerialPort
+// - https://developer.mozilla.org/en-US/docs/Web/API/Streams_API/Concepts
+// - https://developer.mozilla.org/en-US/docs/Web/API/TextDecoderStream
+// - https://developer.mozilla.org/en-US/docs/Glossary/Base64
 //
 "use strict";
 
@@ -21,7 +25,7 @@ const SIZE = document.querySelector('#size');  // Frame size (px per side)
 const BPP = document.querySelector('#bpp');    // Bits per pixel
 
 // Serial Port
-var PORT = null;
+var SER_PORT = null;
 
 // Update status line span
 function setStatus(s) {
@@ -42,28 +46,125 @@ function expandIntoRGBA(luma, rgba) {
     }
 }
 
-// Process video frames
-function handleNewFrame(now, metadata) {
+// Disconnect serial port and stop updating the canvas
+async function disconnect(status) {
+    if (SER_PORT) {
+        await SER_PORT.forget();
+        SER_PORT = null;
+    }
+    SER_BTN.classList.remove('on');
+    SER_BTN.textContent = 'Connect';
+    setStatus(status ? status : 'disconnected');
+}
+
+async function paintFrame(data) {
     // Set canvas size
     const w = Number(SIZE.value);
     const h = w;
     CANVAS.width = w;
     CANVAS.height = h;
-    // TODO: decode web serial frame into luma array
-    // TODO: Draw luma values back to canvas as RGBA pixels
-    //expandIntoRGBA(luma, rgba);
-    //CTX.putImageData(imageData, 0, 0);
+    // getImageData returns RGBA Uint8ClampedArray of pixels in row-major order
+    const imageData = CTX.getImageData(0, 0, w, h);
+    const rgba = imageData.data;
+    const luma = Uint8ClampedArray.from(data);
+    expandIntoRGBA(luma, rgba);
+    CTX.putImageData(imageData, 0, 0);
 }
 
-// Disconnect serial port and stop updating the canvas
-async function disconnect(status) {
-    if (PORT) {
-        await PORT.forget();
-        PORT = null;
+// Parse complete lines to assemble frames
+async function parseLine(line, state) {
+    if(!state.frameSync) {
+        // Ignore lines until the first start of frame marker
+        // Wait to sync with start of frame
+        if (line == '-----BEGIN FRAME-----') {
+            state.frameSync = true;
+            state.data = [];
+        } else if (line.startsWith('mem_free ')) {
+            // Only log mem_free lines when the number has changed
+            if (line != state.memFree) {
+                state.memFree = line;
+                console.log(line);
+            }
+        }
+    } else {
+        // When frame sync is locked, save base64 data until end of frame mark
+        if (line == '-----END FRAME-----') {
+            state.frameSync = false;
+            try {
+                // Decode the base64 using the Data URL decoder because the
+                // old school btoa() decoder function is problematic
+                const dataUrlPrefix = 'data:application/octet-stream;base64,';
+                const buf = await fetch(dataUrlPrefix + state.data.join(''));
+                const data = new Uint8Array(await buf.arrayBuffer());
+                paintFrame(data);
+            } catch (e) {
+                console.log("bad frame", e);
+            }
+        } else {
+            // This is a base64 data chunk
+            state.data.push(line);
+        }
     }
-    SER_BTN.classList.remove('on');
-    SER_BTN.textContent = 'Connect';
-    setStatus(status ? status : 'disconnected');
+}
+
+// Do a base64 decode, including compensation for historical weirdness with
+// the way Javascript's atob() function handles binary values above 0x7f
+async function base64Decode(ascii) {
+    return Uint8Array.from(atob(ascii), (n) => n.codePointAt(0));
+}
+
+// Parse a chunk of serial data to assemble complete lines.
+// CAUTION: This expects '\r\n' line endings!
+async function parseChunk(chunk, state) {
+    if (!state.lineSync) {
+        // Ignore everything up to the first line ending, then start buffering
+        // the next line
+        const n = chunk.indexOf('\r\n');
+        if (n >= 0) {
+            state.lineBuf = (chunk.slice(n+2));
+            state.lineSync = true;
+        }
+    } else {
+        // Once line sync is locked, just append the next chunk
+        state.lineBuf += chunk;
+    }
+    // Parse complete lines off the front of the buffered chunks
+    var i = state.lineBuf.indexOf('\r\n');
+    while(i >= 0) {
+        const line = state.lineBuf.substr(0, i);
+        state.lineBuf = state.lineBuf.substr(i+2);
+        parseLine(line, state);
+        i = state.lineBuf.indexOf('\r\n');
+    }
+}
+
+// Decode base64 encoded frame buffer updates from the serial port
+async function readFrames(port) {
+    const reader = port.readable
+        .pipeThrough(new TextDecoderStream())
+        .getReader();
+    const state = {
+        lineSync: false,
+        frameSync: false,
+        lineBuf: '',
+        data: [],
+        memFree: '',
+    };
+    while(port.readable) {
+        try {
+            const {done, value} = await reader.read();
+            if (done) {
+                reader.releaseLock();
+                break;
+            }
+            if (value.length > 0) {
+                parseChunk(value, state);
+            }
+        } catch(err) {
+            // This is normal for a disconnect (button or USB cable)
+            break;
+        }
+    }
 }
 
 // Attempt to start virtual display with data feed over Web Serial
@@ -79,23 +180,22 @@ function connect() {
     navigator.serial
     .requestPort({filters: circuitpyFilter})
     .then(async (response) => {
-        PORT = await response;
-        PORT.ondisconnect = async (event) => {
+        SER_PORT = await response;
+        SER_PORT.ondisconnect = async (event) => {
             await event.target.close();
             disconnect('serial device unplugged');
         };
-        await PORT.open({baudRate: 115200});
+        await SER_PORT.open({baudRate: 115200});
         // Update HTML button
         SER_BTN.classList.add('on');
         SER_BTN.textContent = 'disconnect';
         // Update status line
         setStatus('connected');
-        // ========================================================
-        // TODO: begin polling serial port for frame buffer updates
-        // ========================================================
+        // Begin reading frame buffer updates
+        readFrames(SER_PORT);
     })
     .catch((err) => {
-        PORT = null;
+        SER_PORT = null;
         setStatus('no serial port selected');
     });
 }

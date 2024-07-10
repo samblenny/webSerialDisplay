@@ -53,6 +53,7 @@ async function disconnect(status) {
     setStatus(status ? status : 'disconnected');
 }
 
+// Update HTML canvas element with pixels for a new virtual display frame
 async function paintFrame(data) {
     // Set size of virtual display (should be 96x96 or 240x240)
     const w = Math.round(Math.sqrt(data.length));
@@ -101,12 +102,6 @@ async function parseLine(line, state) {
             state.data.push(line);
         }
     }
-}
-
-// Do a base64 decode, including compensation for historical weirdness with
-// the way Javascript's atob() function handles binary values above 0x7f
-async function base64Decode(ascii) {
-    return Uint8Array.from(atob(ascii), (n) => n.codePointAt(0));
 }
 
 // Parse a chunk of serial data to assemble complete lines.
